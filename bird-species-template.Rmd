@@ -11,17 +11,20 @@ output: html_notebook
 ```{r}
 # Load `tidyverse` and `dcData` packages
 
-
+library(tidyverse)
+library(dcData)
 
 
 # Load the `OrdwayBirds` data set into your RStudio environment from the `dcData` package
 
+data(OrdwayBirds)
 
 
 
 # Show a few commands used to inspect the data set a few different ways
 
-
+str(OrdwayBirds)
+summary(OrdwayBirds)
 
 ```
 
@@ -36,7 +39,11 @@ Before we begin, the book gives us some instructions to select a few key variabl
 ```{r}
 # Get the data table & clean up dates (see Data Computing eBook)
 
-
+OrdwayBirds <-
+  OrdwayBirds %>%
+  select(SpeciesName,Month,Day) %>%
+  mutate(Month= as.numeric(as.character(Month)),Day=as.numeric(as.character(Day)))
+  
 
 # Inspect resulting data
 
@@ -53,10 +60,12 @@ Before we begin, the book gives us some instructions to select a few key variabl
 ```{r}
 # unique species in original data (including mis-spellings)
 
+distinct_species <- n_distinct(OrdwayBirds$SpeciesName)
 
 
 # unique species in the clean list
 
+distinct_species_cleaned <- n_distinct(OrdwaySpeciesNames$SpeciesNameCleaned)
 
 
 ```
@@ -69,12 +78,15 @@ Before we begin, the book gives us some instructions to select a few key variabl
 
 ```{r}
 # inspect OrdwaySpeciesNames
-
+Corrected <- OrdwayBirds %>%
+ 
+  
 
 # inner join
 
-
-
+inner_join(OrdwaySpeciesNames) %>%
+  select(Species= SpeciesNameCleaned, Month, Day) %>% na.omit()
+head(Corrected)
 
 # inspect the data after the join
 
@@ -83,21 +95,36 @@ Before we begin, the book gives us some instructions to select a few key variabl
 
 
 ### Step 3
-
 We want to identify the top 5-6 bird species sighted at the Katherine Ordway Natural History Study Area.
 
 ```{r}
 # count sightings by species in descending order
 
+sightings <- Corrected %>%
+  count(Species, sort = TRUE)
+
+top_species <- head(sightings, n = 6)
 
 
 
 # a hint in the text book recommends displaying the top 10 species to choose our threshold
 
+top_species <- Corrected %>%
+  count(Species, sort = TRUE) %>%
+  head(10)
+
 
 
 # define a sightings threshold; produce a table with only birds belonging to major species
 
+threshold <- 50  
+
+major_species <- Corrected %>%
+  count(Species, sort = TRUE) %>%
+  filter(n > threshold)
+
+MajorBirds <- Corrected %>%
+  filter(Species %in% major_species$Species)
 
 
 
@@ -111,6 +138,9 @@ We now want to produce a month-by-month count for each of the major species, and
 ```{r}
 # prepare glyph-ready data table called `ByMonth`
 
+ByMonth <- MajorBirds %>%
+  group_by(Month, Species) %>%
+  summarise(Count = n(), .groups = "drop")
 
 
 ```
@@ -120,38 +150,76 @@ Now use the ggplot template below to generate the desired graph. (Remark you can
 
 
 ```{r}
-# ggplot commands
-
-ByMonth %>% 
-  ggplot(aes(x = Month, y = count, color = Species)) + 
+ ByMonth %>%
+  ggplot(aes(x = Month, y = Count, color = Species)) +
   geom_line()
 
-ByMonth %>% ggplot(aes(x=Month,y=count ,fill=Species)) +
-  geom_bar(stat='identity',position='stack', width=.9) 
 
 ```
 
 According to the graph, we can answer the questions posed:
 
 ##### 1. Which species are present year-round?  
-
+"American Goldfinch"      "Black-capped Chickadee"  "White-breasted Nuthatch"
 
 
 ##### 2. Which species are migratory, that is, primarily present in one or two seasons?
 
-
+"Black-throat Sparrow"
 
 
 ##### 3. What is the peak month for each major species? (bullet list)
 
-
+[1] "10" "5"  "11" "1"  "3"  "5"  "8"  "9"  "5"  "5"  "7"  "5"  "10" "10" "9"  "10" "9"  "10"
+[19] "5"  "5"  "5"  "10" "10" "4"  "5"  "5"  "9"  "3"  "10" "10" "10" "5" 
 
 
 ##### 4. Which major species are seen in good numbers for at least 6 months of the year?
 
-
+[1] "American Goldfinch"      "Black-capped Chickadee"  "Cardinal"               
+ [4] "Catbird"                 "Cedar Waxwing"           "Chipping Sparrow"       
+ [7] "Field Sparrow"           "House Wren"              "Least Flycatcher"       
+[10] "Lincoln's Sparrow"       "Myrtle Warbler"          "Purple Finch"           
+[13] "Red-Winged Blackbird"    "Robin"                   "Rose Breasted Grosbeak" 
+[16] "Slate-colored Junco"     "Song Sparrow"            "Tree Swallow"           
+[19] "White-breasted Nuthatch"
 
 ```{r}
+year_round_species <- ByMonth %>%
+  group_by(Species) %>%
+  summarise(Num_Months = n_distinct(Month))
+
+year_round_species <- year_round_species %>%
+  filter(Num_Months == 12)
+
+year_round_species$Species
+
+migratory_species <- ByMonth %>%
+  group_by(Species) %>%
+  summarise(Num_Months = n_distinct(Month))
+
+migratory_species <- migratory_species %>%
+  filter(Num_Months <= 2)
+
+migratory_species$Species
+
+peak_months <- ByMonth %>%
+  group_by(Species) %>%
+  filter(Count == max(Count)) %>%
+  summarise(Peak_Months = paste(Month, collapse = ", "))
+
+peak_months$Species
+peak_months$Peak_Months
+
+species_six_months <- ByMonth %>%
+  group_by(Species) %>%
+  summarise(Num_Months = n_distinct(Month)) %>%
+  filter(Num_Months >= 6)
+
+species_six_months$Species
+
+
+
 
 ```
 
